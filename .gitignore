@@ -1,2 +1,6 @@
 .venv
 .idea/
+__pycache__/
+*.py[cod]
+output/
+.pytest_cache/
