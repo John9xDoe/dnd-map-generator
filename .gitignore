@@ -4,3 +4,6 @@ __pycache__/
 *.py[cod]
 output/
 .pytest_cache/
+build/
+dist/
+*.spec
