@@ -33,6 +33,11 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Показать карту в окне pygame (если есть дисплей)",
     )
+    p.add_argument(
+        "--gui",
+        action="store_true",
+        help="Открыть графический редактор (tkinter)",
+    )
     return p.parse_args()
 
 
@@ -71,6 +76,12 @@ def maybe_show_pygame(image_path: Path) -> None:
 
 def main() -> int:
     args = parse_args()
+    if args.gui:
+        from forestmap.gui.app import run_app
+
+        run_app()
+        return 0
+
     cfg = load_config(args.config)
     if args.seed is not None:
         cfg.seed = args.seed
