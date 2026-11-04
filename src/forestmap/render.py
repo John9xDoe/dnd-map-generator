@@ -112,31 +112,46 @@ def _cliff_hachures(
     dem: np.ndarray,
     scale: int,
 ) -> None:
-    """Tick marks pointing downslope — classic cliff/обрыв sign."""
+    """
+    Continuous escarpment: filled cliff band + dense downslope hachures
+    along the scarp front (no speckled single-pixel holes).
+    """
     h, w = cliff_mask.shape
-    gy, gx = np.gradient(dem)
-    for r in range(1, h - 1, 1):
-        for c in range(1, w - 1, 1):
+    # Solid band underlay so holes don't show through hypsometry.
+    for r, c in zip(*np.where(cliff_mask)):
+        x0, y0 = int(c) * scale, int(r) * scale
+        draw.rectangle(
+            [x0, y0, x0 + scale, y0 + scale],
+            fill=(118, 96, 72, 210),
+        )
+
+    gy, gx = np.gradient(dem.astype(np.float64))
+    # Scarp front = cliff cell with a non-cliff neighbour.
+    for r in range(1, h - 1):
+        for c in range(1, w - 1):
             if not cliff_mask[r, c]:
                 continue
-            # Only draw on the steep rim (neighbor not cliff) for readability.
             if cliff_mask[r - 1 : r + 2, c - 1 : c + 2].all():
+                continue
+            # Skip every other rim cell only when scale is tiny; otherwise dense.
+            if scale <= 2 and ((r + c) & 1):
                 continue
             x = c * scale + scale // 2
             y = r * scale + scale // 2
             vx, vy = float(gx[r, c]), float(gy[r, c])
             norm = max((vx * vx + vy * vy) ** 0.5, 1e-9)
-            # Downslope unit vector.
             ux, uy = vx / norm, vy / norm
-            length = max(3, scale)
+            length = max(scale + 1, int(1.6 * scale))
             x1 = int(x + ux * length)
             y1 = int(y + uy * length)
-            draw.line([(x, y), (x1, y1)], fill=(92, 70, 48), width=1)
-            # Small base tick.
+            draw.line([(x, y), (x1, y1)], fill=(78, 56, 38, 230), width=max(1, scale // 2))
             px, py = -uy, ux
             draw.line(
-                [(int(x - px * 2), int(y - py * 2)), (int(x + px * 2), int(y + py * 2))],
-                fill=(70, 52, 36),
+                [
+                    (int(x - px * (scale * 0.7)), int(y - py * (scale * 0.7))),
+                    (int(x + px * (scale * 0.7)), int(y + py * (scale * 0.7))),
+                ],
+                fill=(60, 44, 30, 230),
                 width=1,
             )
 
@@ -197,15 +212,29 @@ def render_symbolic_map(
     if cfg.show_contours:
         _draw_contours(draw, dem, scale, cfg.contour_levels)
 
-    _draw_lake(draw, hydro.lake_mask, scale)
-    _draw_rivers(draw, hydro, scale)
+    # Land cover first, then water on top — trees never visually sit on water.
     _cliff_hachures(draw, features.cliff_mask, dem, scale)
 
+    water_block = getattr(features, "water_block", hydro.lake_mask | hydro.river_mask)
     rng = np.random.default_rng(seed + 99)
+    hh, ww = dem.shape
     for r, c in features.trees:
+        ir = int(np.clip(round(float(r)), 0, hh - 1))
+        ic = int(np.clip(round(float(c)), 0, ww - 1))
+        if water_block[ir, ic] or features.cliff_mask[ir, ic]:
+            continue
+        # Also reject if any neighbour cell in symbol footprint is water.
+        pad = 1
+        r0, r1 = max(0, ir - pad), min(hh, ir + pad + 1)
+        c0, c1 = max(0, ic - pad), min(ww, ic + pad + 1)
+        if water_block[r0:r1, c0:c1].any():
+            continue
         x = float(c) * scale + scale / 2
         y = float(r) * scale + scale / 2
         _draw_tree(draw, x, y, scale, int(rng.integers(0, 2)))
+
+    _draw_lake(draw, hydro.lake_mask, scale)
+    _draw_rivers(draw, hydro, scale)
 
     _legend(draw, img.width, img.height, scale)
     return img.convert("RGB")

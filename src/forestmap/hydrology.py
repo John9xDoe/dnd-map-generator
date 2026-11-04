@@ -265,6 +265,21 @@ def extract_rivers(
                 river_mask[r, c] = True
         paths.append(path)
 
+    # Widen channels by local bank cells (floodplain strip proxy).
+    bank = max(0, int(getattr(cfg, "river_bank_cells", 1)))
+    if bank > 0 and river_mask.any():
+        core = river_mask.copy()
+        for r, c in zip(*np.where(core)):
+            a = float(accumulation[r, c])
+            rad = bank if a < 200 else bank + 1
+            for dr in range(-rad, rad + 1):
+                for dc in range(-rad, rad + 1):
+                    if dr * dr + dc * dc > rad * rad:
+                        continue
+                    nr, nc = int(r) + dr, int(c) + dc
+                    if 0 <= nr < h and 0 <= nc < w and not lake_mask[nr, nc]:
+                        river_mask[nr, nc] = True
+
     return river_mask, paths
 
 

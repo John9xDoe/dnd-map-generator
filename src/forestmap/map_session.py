@@ -8,6 +8,7 @@ import numpy as np
 from PIL import Image
 
 from .config import TerrainConfig
+from .erosion import evolve_landscape
 from .features import FeatureResult, extract_features
 from .heightmap import compute_slope, generate_heightmap, smooth_dem
 from .hydrology import HydrologyResult, analyze_hydrology
@@ -67,6 +68,8 @@ def build_session(cfg: TerrainConfig, *, dem: np.ndarray | None = None) -> MapSe
     if dem is None:
         dem = generate_heightmap(cfg.width, cfg.height, cfg.seed, cfg.noise)
         dem = smooth_dem(dem, cfg.dem_pre_smooth_sigma)
+        dem = evolve_landscape(dem, cfg.erosion)
+        dem = smooth_dem(dem, max(0.35, cfg.dem_pre_smooth_sigma * 0.45))
     else:
         dem = dem.astype(np.float64)
         dem = (dem - dem.min()) / max(float(dem.max() - dem.min()), 1e-12)

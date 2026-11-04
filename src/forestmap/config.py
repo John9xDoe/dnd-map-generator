@@ -5,53 +5,70 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
+@dataclass
+class ErosionConfig:
+    enabled: bool = True
+    thermal_iterations: int = 10
+    talus_tangent: float = 0.08
+    thermal_rate: float = 0.25
+    fluvial_iterations: int = 24
+    stream_power_k: float = 0.010
+    area_exp: float = 0.5
+    slope_exp: float = 1.0
+    max_incision_per_step: float = 0.015
+    uplift: float = 0.0006
+
 
 @dataclass
 class NoiseConfig:
     octaves: int = 6
-    lacunarity: float = 2.1
-    persistence: float = 0.52
-    base_scale: float = 0.0085
-    ridge_mix: float = 0.28
-    warp_strength: float = 42.0
-    warp_scale: float = 0.0045
-    mountain_bias: float = 0.15
+    lacunarity: float = 2.05
+    persistence: float = 0.48
+    base_scale: float = 0.0072
+    ridge_mix: float = 0.26
+    warp_strength: float = 36.0
+    warp_scale: float = 0.0038
+    mountain_bias: float = 0.14
 
 
 @dataclass
 class HydrologyConfig:
-    epsilon: float = 1.5e-4
-    lake_min_depth: float = 0.045
-    lake_min_cells: int = 70
-    lake_max_fraction: float = 0.08
-    lake_max_count: int = 10
-    river_accumulation_quantile: float = 0.972
-    min_river_length: int = 10
+    epsilon: float = 1.2e-4
+    lake_min_depth: float = 0.05
+    lake_min_cells: int = 80
+    lake_max_fraction: float = 0.07
+    lake_max_count: int = 8
+    river_accumulation_quantile: float = 0.982
+    min_river_length: int = 14
+    river_bank_cells: int = 1
 
 
 @dataclass
 class CliffConfig:
-    slope_threshold: float = 0.55
-    slope_percentile: float = 0.97
-    min_component_cells: int = 10
+    slope_threshold: float = 0.45
+    slope_percentile: float = 0.982
+    min_component_cells: int = 16
+    morph_close_iters: int = 3
+    band_width_cells: int = 3
 
 
 @dataclass
 class ForestConfig:
-    target_density: float = 0.22
-    max_slope: float = 0.42
-    elev_min: float = 0.12
-    elev_max: float = 0.82
-    moisture_weight: float = 0.55
-    clustering_scale: float = 0.035
+    target_density: float = 0.15
+    max_slope: float = 0.55
+    elev_min: float = 0.08
+    elev_max: float = 0.86
+    moisture_weight: float = 0.62
+    clustering_scale: float = 0.028
     min_spacing_cells: int = 2
+    water_buffer_cells: int = 3
 
 
 @dataclass
 class RenderConfig:
     pixel_scale: int = 3
     show_contours: bool = True
-    contour_levels: int = 8
+    contour_levels: int = 7
     output_path: str = "output/forest_map.png"
     debug_panels_path: str = "output/forest_debug.png"
 
@@ -62,9 +79,10 @@ class TerrainConfig:
     width: int = 256
     height: int = 256
     cell_size_m: float = 8.0
-    relief_amplitude_m: float = 95.0
+    relief_amplitude_m: float = 58.0
     dem_pre_smooth_sigma: float = 0.85
     noise: NoiseConfig = field(default_factory=NoiseConfig)
+    erosion: ErosionConfig = field(default_factory=ErosionConfig)
     hydrology: HydrologyConfig = field(default_factory=HydrologyConfig)
     cliffs: CliffConfig = field(default_factory=CliffConfig)
     forest: ForestConfig = field(default_factory=ForestConfig)
@@ -90,9 +108,10 @@ def load_config(path: str | Path | None = None) -> TerrainConfig:
         width=int(raw.get("width", 256)),
         height=int(raw.get("height", 256)),
         cell_size_m=float(raw.get("cell_size_m", 8.0)),
-        relief_amplitude_m=float(raw.get("relief_amplitude_m", 95.0)),
+        relief_amplitude_m=float(raw.get("relief_amplitude_m", 58.0)),
         dem_pre_smooth_sigma=float(raw.get("dem_pre_smooth_sigma", 0.85)),
         noise=_merge(NoiseConfig, raw.get("noise")),
+        erosion=_merge(ErosionConfig, raw.get("erosion")),
         hydrology=_merge(HydrologyConfig, raw.get("hydrology")),
         cliffs=_merge(CliffConfig, raw.get("cliffs")),
         forest=_merge(ForestConfig, raw.get("forest")),

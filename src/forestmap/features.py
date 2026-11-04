@@ -18,13 +18,76 @@ class FeatureResult:
     moisture: np.ndarray
     suitability: np.ndarray
     trees: np.ndarray  # (N, 2) row/col float positions
+    water_block: np.ndarray  # dilated water (lakes+rivers+banks)
+
+
+def _binary_dilate(mask: np.ndarray, iterations: int = 1) -> np.ndarray:
+    if iterations <= 0:
+        return mask.astype(bool)
+    out = mask.astype(bool)
+    for _ in range(iterations):
+        padded = np.pad(out, 1, mode="constant", constant_values=False)
+        grown = np.zeros_like(out)
+        for dr in (-1, 0, 1):
+            for dc in (-1, 0, 1):
+                grown |= padded[1 + dr : 1 + dr + out.shape[0], 1 + dc : 1 + dc + out.shape[1]]
+        out = grown
+    return out
+
+
+def _binary_erode(mask: np.ndarray, iterations: int = 1) -> np.ndarray:
+    if iterations <= 0:
+        return mask.astype(bool)
+    out = mask.astype(bool)
+    for _ in range(iterations):
+        padded = np.pad(out, 1, mode="constant", constant_values=False)
+        kept = np.ones_like(out, dtype=bool)
+        for dr in (-1, 0, 1):
+            for dc in (-1, 0, 1):
+                kept &= padded[1 + dr : 1 + dr + out.shape[0], 1 + dc : 1 + dc + out.shape[1]]
+        out = kept
+    return out
+
+
+def _morph_close(mask: np.ndarray, iterations: int) -> np.ndarray:
+    """Close = dilate then erode — fills 1-pixel holes in cliff bands."""
+    return _binary_erode(_binary_dilate(mask, iterations), iterations)
+
+
+def _fill_holes(mask: np.ndarray) -> np.ndarray:
+    """Fill enclosed False pockets inside True components (background flood)."""
+    h, w = mask.shape
+    fill = mask.astype(bool).copy()
+    visited = np.zeros((h, w), dtype=bool)
+    stack: list[tuple[int, int]] = []
+    for r in range(h):
+        for c in (0, w - 1):
+            if not fill[r, c] and not visited[r, c]:
+                stack.append((r, c))
+                visited[r, c] = True
+    for c in range(w):
+        for r in (0, h - 1):
+            if not fill[r, c] and not visited[r, c]:
+                stack.append((r, c))
+                visited[r, c] = True
+    while stack:
+        r, c = stack.pop()
+        for dr, dc in D8:
+            nr, nc = r + dr, c + dc
+            if 0 <= nr < h and 0 <= nc < w and not visited[nr, nc] and not fill[nr, nc]:
+                visited[nr, nc] = True
+                stack.append((nr, nc))
+    # Unvisited False cells are holes → set True.
+    holes = (~fill) & (~visited)
+    fill[holes] = True
+    return fill
 
 
 def _label_and_filter(mask: np.ndarray, min_cells: int) -> np.ndarray:
     h, w = mask.shape
     labels = np.zeros((h, w), dtype=np.int32)
     lid = 0
-    keep_mask = np.zeros_like(mask)
+    keep_mask = np.zeros_like(mask, dtype=bool)
     for r in range(h):
         for c in range(w):
             if not mask[r, c] or labels[r, c]:
@@ -53,11 +116,34 @@ def _label_and_filter(mask: np.ndarray, min_cells: int) -> np.ndarray:
 
 
 def extract_cliffs(slope: np.ndarray, cfg: CliffConfig) -> np.ndarray:
-    # Absolute steepness OR local extreme — works across relief amplitudes.
+    """
+    Continuous escarpment bands: threshold → morph close → fill holes →
+    thicken → drop tiny speckles.
+    """
     pct = float(np.quantile(slope, cfg.slope_percentile))
     thr = max(float(cfg.slope_threshold), pct)
     raw = slope >= thr
-    return _label_and_filter(raw, cfg.min_component_cells)
+    try:
+        from scipy import ndimage as ndi
+
+        structure = np.ones((3, 3), dtype=bool)
+        closed = ndi.binary_closing(
+            raw, structure=structure, iterations=max(1, cfg.morph_close_iters)
+        )
+        # Remove pepper noise, then close again so the scarp is a solid ribbon.
+        closed = ndi.binary_opening(closed, structure=structure, iterations=1)
+        closed = ndi.binary_closing(
+            closed, structure=structure, iterations=max(1, cfg.morph_close_iters)
+        )
+        filled = ndi.binary_fill_holes(closed)
+        band = ndi.binary_dilation(
+            filled, structure=structure, iterations=max(0, cfg.band_width_cells - 1)
+        )
+    except Exception:
+        closed = _morph_close(raw, max(1, cfg.morph_close_iters))
+        filled = _fill_holes(closed)
+        band = _binary_dilate(filled, max(0, cfg.band_width_cells - 1))
+    return _label_and_filter(band.astype(bool), cfg.min_component_cells)
 
 
 def topographic_wetness(
@@ -65,11 +151,6 @@ def topographic_wetness(
     slope: np.ndarray,
     cell_size_m: float,
 ) -> np.ndarray:
-    """
-    Beven & Kirkby TWI proxy: ln(a / tan(β)).
-    High values → hollows / toeslopes that stay moist → denser forest.
-    """
-    # Specific catchment area proxy (cells * cell area / cell width).
     a = accumulation * cell_size_m
     beta = np.maximum(slope, 1e-4)
     twi = np.log(a / beta)
@@ -85,17 +166,6 @@ def place_trees(
     seed: int,
     cfg: ForestConfig,
 ) -> tuple[np.ndarray, np.ndarray]:
-    """
-    Suitability-driven thinned point process.
-
-    Real forest constraints encoded:
-    - no stands in water / cliffs
-    - avoid steep slopes (shallow soils, windthrow)
-    - elevation band (temperate forest belt)
-    - moisture (TWI) attracts denser canopy near streams/toeslopes
-    - clustered noise → groves instead of uniform sprinkle
-    - min spacing → crown competition / map readability
-    """
     h, w = dem.shape
     elev_ok = (dem >= cfg.elev_min) & (dem <= cfg.elev_max)
     slope_factor = np.clip(1.0 - slope / max(cfg.max_slope, 1e-6), 0.0, 1.0)
@@ -119,8 +189,11 @@ def place_trees(
     suitability = np.where(blocked | (slope > cfg.max_slope), 0.0, suitability)
 
     rng = np.random.default_rng(seed + 7)
-    # Soft threshold so only relatively good cells compete.
-    soft = np.quantile(suitability[suitability > 0], 0.35) if np.any(suitability > 0) else 1.0
+    soft = (
+        np.quantile(suitability[suitability > 0], 0.35)
+        if np.any(suitability > 0)
+        else 1.0
+    )
     candidates = np.argwhere(suitability >= soft)
     if candidates.size == 0:
         return suitability, np.zeros((0, 2), dtype=np.float64)
@@ -138,15 +211,22 @@ def place_trees(
 
     for r, c in candidates:
         r, c = int(r), int(c)
-        if occupied[r, c]:
+        if occupied[r, c] or blocked[r, c]:
             continue
-        # Probabilistic accept scaled by suitability.
         p = float(suitability[r, c])
         if rng.random() > min(1.0, 0.25 + 0.75 * p):
             continue
-        jitter_r = float(r) + float(rng.uniform(-0.35, 0.35))
-        jitter_c = float(c) + float(rng.uniform(-0.35, 0.35))
-        chosen.append((jitter_r, jitter_c))
+        # Small jitter, but never onto blocked water/cliff cells.
+        for _ in range(6):
+            jitter_r = float(r) + float(rng.uniform(-0.25, 0.25))
+            jitter_c = float(c) + float(rng.uniform(-0.25, 0.25))
+            ir = int(np.clip(round(jitter_r), 0, h - 1))
+            ic = int(np.clip(round(jitter_c), 0, w - 1))
+            if not blocked[ir, ic]:
+                chosen.append((jitter_r, jitter_c))
+                break
+        else:
+            continue
         r0 = max(0, r - spacing)
         r1 = min(h, r + spacing + 1)
         c0 = max(0, c - spacing)
@@ -172,14 +252,29 @@ def extract_features(
 ) -> FeatureResult:
     cliff_mask = extract_cliffs(slope, cliffs_cfg)
     moisture = topographic_wetness(accumulation, slope, cell_size_m)
-    # Rivers locally boost moisture for riparian stands.
     moisture = np.clip(moisture + 0.15 * river_mask.astype(np.float64), 0.0, 1.0)
-    blocked = lake_mask | river_mask | cliff_mask
+
+    water = lake_mask | river_mask
+    water_block = _binary_dilate(water, max(1, forest_cfg.water_buffer_cells))
+    blocked = water_block | cliff_mask
     suitability, trees = place_trees(dem, slope, moisture, blocked, seed, forest_cfg)
+
+    # Final hard filter: drop any tree whose nearest cell is water-blocked.
+    if len(trees):
+        keep = []
+        h, w = dem.shape
+        for r, c in trees:
+            ir = int(np.clip(round(r), 0, h - 1))
+            ic = int(np.clip(round(c), 0, w - 1))
+            if not water_block[ir, ic] and not cliff_mask[ir, ic]:
+                keep.append((r, c))
+        trees = np.asarray(keep, dtype=np.float64) if keep else np.zeros((0, 2))
+
     return FeatureResult(
         slope=slope,
         cliff_mask=cliff_mask,
         moisture=moisture,
         suitability=suitability,
         trees=trees,
+        water_block=water_block,
     )

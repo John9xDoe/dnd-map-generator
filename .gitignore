@@ -6,4 +6,6 @@ output/
 .pytest_cache/
 build/
 dist/
-*.spec
+*.specdocs/geology_refs/*.pdf
+docs/geology_refs/*_extract.txt
+docs/geology_refs/*_snip.txt
