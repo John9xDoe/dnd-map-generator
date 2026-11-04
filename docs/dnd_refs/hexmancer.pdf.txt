@@ -1,0 +1,66 @@
+Hexmancer Procedural Hex Generation System
+It's hexcrawl time! Roll d30, d24, and d20 simultaneously whenever the party enters an unexplored hex. If the d24 roll indicates a 
+feature, make it up or use one of the suggested resources. (If it doesn't, just ignore the result of the d20 roll.) 
+d30: Hex terrain type 
+Reference the column for the terrain type of the hex the party is leaving. 
+d30 Roll Plains Woods Hills Barren Swamp Mountains Water Odds 
+1-15 Plains Woods Hills Barren Swamp Mountains Water 50% 
+16-23 Woods Plains Mountains Hills Water Hills Swamp 26% 
+23-26 Hills Swamp Plains Plains Plains Woods Plains 13% 
+27 Barren Barren Barren Woods Barren Barren Barren 3% 
+28 Swamp Hills Swamp Swamp Hills Swamp Hills 3% 
+29 Mountains Mountains Woods Mountains Mountains Plains Mountains 3% 
+30 Water Water Water Water Woods Water Woods 3% 
+d24: Presence of a feature 
+Determine what type of region the party is in and whether or not they're following a byway or waterway (trail, road, or river), and 
+select the appropriate row. The first column indicates whether or not there's a feature in the hex. Water hexes never have features. 
+d24 roll Region Feature type modifier Odds 
+1-2 Wilderness -2 8% 
+1-3 ...on byway or waterway -1 13% 
+1-3 Borderlands 0 13% 
+1-4 ...on byway or waterway 0 17% 
+1-4 Settled +1 17% 
+1-5 ...on byway or waterway +2 21% 
+d20: Feature type 
+Apply the feature type modifier from the d24 roll (minimum roll 1, maximum roll 20). If the party is following a trail, road, or river, 
+then other results indicate a second feature in the hex (and see "Byways and Waterways" to place the trail/road/river). 
+d20 roll Feature type Odds Suggested resource for feature creation 
+1-3 Ruins 15% 
+4-6 Trail 15% See "Byways and Waterways" in this document 
+7-8 River 10% See "Byways and Waterways" in this document 
+9-10 Road 10% See "Byways and Waterways" in this document 
+11-12 Wizard's tower 10% Abulafia: Wizard Tower generator 
+13-14 Temple 10% 
+15-17 Castle 15% 
+18-20 Village 15% 
+Hexmancer
+Byways and Waterways 
+Because they're not confined to one hex, trails, roads, and rivers work a bit differently than other features. Choose one option based 
+on the current situation: 
+1. Feature is new (not present in the hex they're leaving): Roll d6 and d5. Starting from the top/north side of the new hex,
+count d6 sides clockwise; that's the feature's point of origin. (If it happens to be where the party came from, no worries: It's
+easy to miss stuff while wandering around in the wilderness.) Next, count d5 sides clockwise from that point; that's the side
+where the trail/road/river exits the hex.
+2. Party is following the feature: If the party is following the trail/road/river, roll a d5 and count clockwise from the point of
+origin (the hex side they're leaving). That's the side where feature exits the new hex.
+3. Party isn't following the feature: If they're deliberately not following the trail, road, or river, only place the feature in the new
+hex (using option 1) if its point of origin is the hex side the party is entering.
+You may need to apply a bit of logic, or tweak the results, in order to make byways and waterways fit the map. 
+Design notes 
+Hexmancer is designed to procedurally generate a fantasy borderlands/wilderness region in "fantasy Western Europe," with 
+occasional wasteland and weirdness, on the fly during play. It assumes that you're placing dungeons/modules and perhaps a feature 
+or two, but otherwise starting out with the PCs in a village surrounded by a blank hex map. 
+Terrain types that I don't want to come up randomly, like desert and ocean, are excluded. There are also all sorts of other features 
+that could be on the d20 table, from monster lairs to cave systems to islands, but they're things I didn't want to handle procedurally 
+(or didn't want in a dungeon-focused hexcrawl). 
+Hexmancer uses funky dice because funky dice are awesome, and because they suit its probability needs. If you don't own a d5, d24, 
+or d30, Purple Sorcerer's online dice roller includes them. 
+Acknowledgements 
+This system is based on the one found in Wilderness Hexplore Revised, which was created by Jedo of the New York Red Box forums. 
+The core "Terrain > Feature? > Feature" mechanic and the broad relationships between terrain types in Hexmancer owe the most to 
+Jedo's system. 
+Hexmancer can be downloaded for free from Yore. You can also read an extended example of using it to generate hexes. I hope 
+Hexmancer is useful to you, and happy gaming! —Martin Ralya 
+Copyright © 2016 by Martin Ralya. All rights reserved. 
+Hexmancer, the Hexmancer logo, and the Yore logo are trademarks of Martin Ralya. 
+Version 1.2, published February 19, 2020 
