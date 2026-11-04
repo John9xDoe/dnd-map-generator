@@ -9,3 +9,6 @@ dist/
 *.specdocs/geology_refs/*.pdf
 docs/geology_refs/*_extract.txt
 docs/geology_refs/*_snip.txt
+
+PCG_books/
+!PCG_books/*.md
