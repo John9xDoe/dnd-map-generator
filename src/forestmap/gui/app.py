@@ -299,14 +299,25 @@ class Sidebar(ttk.Frame):
             fill=tk.X, pady=2
         )
         ttk.Button(
-            btns, text="Пересчитать гидрологию с DEM", command=app.recompute_hydro
+            btns,
+            text="Пересчитать с constraints (SketchaWorld)",
+            command=app.recompute_hydro,
         ).pack(fill=tk.X, pady=2)
         ttk.Button(btns, text="Обновить знаковую карту", command=app.refresh_map).pack(
+            fill=tk.X, pady=2
+        )
+        ttk.Button(btns, text="Expressive range…", command=app.run_expressive).pack(
             fill=tk.X, pady=2
         )
         ttk.Button(btns, text="Сохранить PNG…", command=app.save_png).pack(
             fill=tk.X, pady=2
         )
+        self.respect_constraints = tk.BooleanVar(value=True)
+        ttk.Checkbutton(
+            b,
+            text="Кисти = жёсткие constraints при пересчёте",
+            variable=self.respect_constraints,
+        ).pack(anchor=tk.W, padx=8, pady=4)
 
         ttk.Separator(b).pack(fill=tk.X, padx=8, pady=6)
         ttk.Label(b, text="Слой отображения", font=("DejaVu Sans", 11, "bold")).pack(
@@ -461,7 +472,14 @@ class ForestMapApp:
             self.cfg = self.sidebar.write_to_config(self.cfg)
             self.root.config(cursor="watch")
             self.root.update_idletasks()
-            self.session = build_session(self.cfg)
+            constraints = None
+            if (
+                self.sidebar.respect_constraints.get()
+                and self.session
+                and self.session.constraints
+            ):
+                constraints = self.session.constraints
+            self.session = build_session(self.cfg, constraints=constraints)
             self._paint_dirty = False
             self.redraw_layer()
             self._update_stats()
@@ -481,6 +499,27 @@ class ForestMapApp:
             self._paint_dirty = False
             self.redraw_layer()
             self._update_stats()
+        except Exception as exc:  # noqa: BLE001
+            messagebox.showerror("Ошибка", str(exc))
+        finally:
+            self.root.config(cursor="")
+
+    def run_expressive(self) -> None:
+        try:
+            from forestmap.expressive_range import run_expressive_range
+
+            self.root.config(cursor="watch")
+            self.root.update_idletasks()
+            seeds = list(range(int(self.cfg.seed), int(self.cfg.seed) + 16))
+            out = run_expressive_range(
+                _default_config_path(),
+                seeds,
+                out_png=self.cfg.render.expressive_range_path,
+            )
+            messagebox.showinfo(
+                "Expressive range",
+                f"Готово: {out['png']}\nCSV: {out['csv']}\nСиды: {seeds[0]}…{seeds[-1]}",
+            )
         except Exception as exc:  # noqa: BLE001
             messagebox.showerror("Ошибка", str(exc))
         finally:
@@ -540,10 +579,15 @@ class ForestMapApp:
         if not self.session:
             return
         s = self.session.stats
+        fit = s.get("fitness") or {}
         self.sidebar.stats_var.set(
             f"Озёра: {s['lake_cells']} · Реки: {s['river_cells']} · "
             f"Тропы: {s['trail_cells']} · Обрывы: {s['cliff_cells']} · "
-            f"Деревья: {s['tree_count']}"
+            f"Деревья: {s['tree_count']}\n"
+            f"DnD fitness: {fit.get('score', 0):.3f} · "
+            f"passable: {fit.get('passable_fraction', 0):.2f} · "
+            f"camps: {fit.get('camp_sites', 0)} · "
+            f"constraints: {sum(int(v.sum()) for v in self.session.constraints.values())}"
         )
 
 

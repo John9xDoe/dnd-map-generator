@@ -38,6 +38,20 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Открыть графический редактор (tkinter)",
     )
+    p.add_argument(
+        "--expressive-range",
+        type=int,
+        nargs="?",
+        const=16,
+        default=None,
+        metavar="N",
+        help="Построить expressive-range по N сидам начиная с --seed",
+    )
+    p.add_argument(
+        "--no-quality",
+        action="store_true",
+        help="Отключить generate-and-test отбор",
+    )
     return p.parse_args()
 
 
@@ -89,13 +103,37 @@ def main() -> int:
         cfg.width = args.width
     if args.height is not None:
         cfg.height = args.height
+    if args.no_quality:
+        cfg.quality.enabled = False
+
+    if args.expressive_range is not None:
+        from forestmap.expressive_range import run_expressive_range
+
+        n = int(args.expressive_range)
+        seeds = list(range(int(cfg.seed), int(cfg.seed) + n))
+        print(f"Expressive range: {n} сидов {seeds[0]}…{seeds[-1]}")
+        out = run_expressive_range(
+            args.config,
+            seeds,
+            out_png=cfg.render.expressive_range_path,
+        )
+        print(json.dumps({"png": out["png"], "csv": out["csv"], "n": len(out["rows"])}, indent=2))
+        # brief table
+        for row in out["rows"][:5]:
+            print(
+                f"  seed={row['seed']} fitness={row['fitness']:.3f} "
+                f"lake={row['lake_fraction']:.3f} camps={row['camp_sites']}"
+            )
+        if len(out["rows"]) > 5:
+            print(f"  … +{len(out['rows']) - 5} rows")
+        return 0
 
     print(
         f"Генерация карты {cfg.width}×{cfg.height}, seed={cfg.seed}, "
         f"ячейка={cfg.cell_size_m} м …"
     )
     result = generate_map(cfg)
-    print(json.dumps(result.stats, ensure_ascii=False, indent=2))
+    print(json.dumps(result.stats, ensure_ascii=False, indent=2, default=str))
     print(f"Карта:  {result.outputs['map']}")
     print(f"Отладка: {result.outputs['debug']}")
 

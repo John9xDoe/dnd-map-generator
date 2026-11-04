@@ -27,6 +27,19 @@
     "max_incision_per_step": 0.015,
     "uplift": 0.0006
   },
+  "agents": {
+    "enabled": true,
+    "n_mountain_agents": 6,
+    "mountain_steps": 90,
+    "mountain_raise": 0.045,
+    "mountain_width": 2,
+    "n_river_agents": 5,
+    "river_min_length": 28,
+    "river_max_attempts": 12,
+    "river_start_width": 0.8,
+    "river_widen_every": 10,
+    "river_carve": 0.035
+  },
   "hydrology": {
     "epsilon": 0.00012,
     "lake_min_depth": 0.05,
@@ -38,9 +51,9 @@
     "river_bank_cells": 1
   },
   "cliffs": {
-    "slope_threshold": 0.45,
-    "slope_percentile": 0.982,
-    "min_component_cells": 16,
+    "slope_threshold": 0.28,
+    "slope_percentile": 0.97,
+    "min_component_cells": 12,
     "morph_close_iters": 3,
     "band_width_cells": 3
   },
@@ -54,11 +67,24 @@
     "min_spacing_cells": 2,
     "water_buffer_cells": 3
   },
+  "quality": {
+    "enabled": true,
+    "max_retries": 6,
+    "max_trees_on_water": 0,
+    "min_river_cells": 80,
+    "max_lake_fraction": 0.12,
+    "min_lake_fraction": 0.01,
+    "min_passable_fraction": 0.35,
+    "min_largest_cc_fraction": 0.55,
+    "max_slope_passable": 0.65
+  },
   "render": {
     "pixel_scale": 3,
     "show_contours": true,
     "contour_levels": 7,
+    "use_lsystem_trees": true,
     "output_path": "output/forest_map.png",
-    "debug_panels_path": "output/forest_debug.png"
+    "debug_panels_path": "output/forest_debug.png",
+    "expressive_range_path": "output/expressive_range.png"
   }
 }

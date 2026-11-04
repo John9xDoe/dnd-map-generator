@@ -156,21 +156,43 @@ def _cliff_hachures(
             )
 
 
-def _draw_tree(draw: ImageDraw.ImageDraw, x: float, y: float, scale: int, kind: int) -> None:
-    """Provisional forest signs: pine wedge / round deciduous."""
+def _draw_tree(
+    draw: ImageDraw.ImageDraw,
+    x: float,
+    y: float,
+    scale: int,
+    kind: int,
+    *,
+    use_lsystem: bool = True,
+) -> None:
+    """Forest signs: L-system glyphs (Ch.5) or simple geometric fallback."""
+    if use_lsystem:
+        from .lsystem import draw_lsystem_tree
+
+        leaf = (42, 92, 48) if kind % 2 == 0 else (58, 110, 55)
+        draw_lsystem_tree(
+            draw, x, y, kind=kind, scale=float(max(2, scale)), leaf_color=leaf
+        )
+        return
     s = max(2, scale)
     if kind == 0:
-        # Conifer: inverted V with trunk.
         top = (int(x), int(y - 1.6 * s))
         left = (int(x - 1.1 * s), int(y + 0.4 * s))
         right = (int(x + 1.1 * s), int(y + 0.4 * s))
         draw.polygon([top, left, right], fill=(42, 92, 48), outline=(28, 64, 34))
         draw.line([(int(x), int(y + 0.4 * s)), (int(x), int(y + 1.2 * s))], fill=(70, 50, 30), width=1)
     else:
-        # Broadleaf: circle canopy + trunk.
         r = int(1.1 * s)
-        draw.ellipse([int(x - r), int(y - r - s // 2), int(x + r), int(y + r - s // 2)], fill=(58, 110, 55), outline=(35, 75, 40))
-        draw.line([(int(x), int(y + r - s // 2)), (int(x), int(y + r + s // 2))], fill=(70, 50, 30), width=1)
+        draw.ellipse(
+            [int(x - r), int(y - r - s // 2), int(x + r), int(y + r - s // 2)],
+            fill=(58, 110, 55),
+            outline=(35, 75, 40),
+        )
+        draw.line(
+            [(int(x), int(y + r - s // 2)), (int(x), int(y + r + s // 2))],
+            fill=(70, 50, 30),
+            width=1,
+        )
 
 
 def _legend(draw: ImageDraw.ImageDraw, width_px: int, height_px: int, scale: int) -> None:
@@ -231,7 +253,14 @@ def render_symbolic_map(
             continue
         x = float(c) * scale + scale / 2
         y = float(r) * scale + scale / 2
-        _draw_tree(draw, x, y, scale, int(rng.integers(0, 2)))
+        _draw_tree(
+            draw,
+            x,
+            y,
+            scale,
+            int(rng.integers(0, 2)),
+            use_lsystem=bool(getattr(cfg, "use_lsystem_trees", True)),
+        )
 
     _draw_lake(draw, hydro.lake_mask, scale)
     _draw_rivers(draw, hydro, scale)
