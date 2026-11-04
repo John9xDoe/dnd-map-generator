@@ -251,6 +251,8 @@ def extract_features(
     forest_cfg: ForestConfig,
 ) -> FeatureResult:
     cliff_mask = extract_cliffs(slope, cliffs_cfg)
+    # Escarpments cannot sit in standing water / channels.
+    cliff_mask = cliff_mask & ~(lake_mask | river_mask)
     moisture = topographic_wetness(accumulation, slope, cell_size_m)
     moisture = np.clip(moisture + 0.15 * river_mask.astype(np.float64), 0.0, 1.0)
 
